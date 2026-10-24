@@ -161,9 +161,9 @@ public class OptimizationDrill {
             Seq<Tile> nearby = supportCandidates(t, drill.size, 8);
 
             for (Tile n : nearby) {
-                // Water extractors must sit on a liquid floor. Build.validPlace
-                // alone is not sufficient for every modded floor/block combo.
-                if (n.floor() == null || !n.floor().isLiquid) continue;
+                // SolidPump / water-extractor validates the required ground
+                // water attribute in Mindustry's own placement rules. It is
+                // not restricted to liquid floors.
                 BuildPlan plan = new BuildPlan(n.x, n.y, 0, Blocks.waterExtractor);
                 if (Util.canPlaceWithoutPlanCollision(plan, team, allPlans)) {
                     allPlans.add(plan);
