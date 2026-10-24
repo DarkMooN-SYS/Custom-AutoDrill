@@ -154,13 +154,16 @@ public class OptimizationDrill {
      *   collide with drills or with each other.
      * - Only adds plans that actually pass validation (requirement 5).
      */
-    private static void placeWaterExtractorsAndPowerNodes(
+    public static void placeWaterExtractorsAndPowerNodes(
             Seq<Tile> selection, Drill drill, Team team, Seq<BuildPlan> allPlans) {
 
         for (Tile t : selection) {
-            Seq<Tile> nearby = Util.getNearbyTiles(t.x, t.y, drill.size, Blocks.waterExtractor.size);
+            Seq<Tile> nearby = supportCandidates(t, drill.size, 8);
 
             for (Tile n : nearby) {
+                // Water extractors must sit on a liquid floor. Build.validPlace
+                // alone is not sufficient for every modded floor/block combo.
+                if (n.floor() == null || !n.floor().isLiquid) continue;
                 BuildPlan plan = new BuildPlan(n.x, n.y, 0, Blocks.waterExtractor);
                 if (Util.canPlaceWithoutPlanCollision(plan, team, allPlans)) {
                     allPlans.add(plan);
@@ -169,8 +172,10 @@ public class OptimizationDrill {
             }
         }
 
+        if (!drill.consumesPower) return;
+
         for (Tile t : selection) {
-            Seq<Tile> nearby = Util.getNearbyTiles(t.x, t.y, drill.size, Blocks.powerNode.size);
+            Seq<Tile> nearby = supportCandidates(t, drill.size, 6);
 
             for (Tile n : nearby) {
                 BuildPlan plan = new BuildPlan(n.x, n.y, 0, Blocks.powerNode);
@@ -180,6 +185,25 @@ public class OptimizationDrill {
                 }
             }
         }
+    }
+
+    /** Return valid map tiles nearest-first within the support block's useful radius. */
+    private static Seq<Tile> supportCandidates(Tile source, int sourceSize, int radius) {
+        Seq<Tile> candidates = new Seq<>();
+        int low = (sourceSize - 1) / 2;
+        int high = sourceSize / 2;
+        int minX = Math.max(0, source.x - low - radius);
+        int maxX = Math.min(Vars.world.width() - 1, source.x + high + radius);
+        int minY = Math.max(0, source.y - low - radius);
+        int maxY = Math.min(Vars.world.height() - 1, source.y + high + radius);
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                Tile candidate = Vars.world.tile(x, y);
+                if (candidate != null) candidates.add(candidate);
+            }
+        }
+        candidates.sort(t -> t.dst2(source.x, source.y));
+        return candidates;
     }
 
     /**
@@ -204,3 +228,4 @@ public class OptimizationDrill {
         return "mechanical";
     }
 }
+
