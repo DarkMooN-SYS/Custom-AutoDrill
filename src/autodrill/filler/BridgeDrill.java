@@ -221,6 +221,20 @@ public class BridgeDrill {
 
         allPlans.addAll(bridgePlans);
 
+        // Laser/airblast drills may need water and power support too. Reuse
+        // the same placement helper as the regular optimizer so supports are
+        // checked against both the drill and bridge plans already queued.
+        Seq<Tile> placedDrills = new Seq<>();
+        for (BuildPlan plan : allPlans) {
+            if (plan.block == drill) {
+                Tile placed = Vars.world.tile(plan.x, plan.y);
+                if (placed != null) placedDrills.add(placed);
+            }
+        }
+        if (Core.settings.getBool(bundle.get("auto-drill.settings.place-water-extractor-and-power-nodes"))) {
+            OptimizationDrill.placeWaterExtractorsAndPowerNodes(placedDrills, drill, team, allPlans);
+        }
+
         // --- Commit phase ---
         Util.commitPlans(allPlans);
 
@@ -281,3 +295,4 @@ public class BridgeDrill {
         return x % 3 == 0 && y % 3 == 0;
     }
 }
+
