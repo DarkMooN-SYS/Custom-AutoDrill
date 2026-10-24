@@ -1,7 +1,7 @@
 # Auto Drill
 
-[![GitHub all releases](https://img.shields.io/github/downloads/Pointifix/AutoDrill/total)](https://github.com/Pointifix/AutoDrill/releases)
-![GitHub Repo stars](https://img.shields.io/github/stars/Pointifix/AutoDrill?style=social)
+[![GitHub all releases](https://img.shields.io/github/downloads/DarkMooN-SYS/Custom-AutoDrill/total)](https://github.com/DarkMooN-SYS/Custom-AutoDrill/releases)
+![GitHub Repo stars](https://img.shields.io/github/stars/DarkMooN-SYS/Custom-AutoDrill?style=social)
 
 Mindustry Mod which adds tools to automatically fill a resource patch with drills.
 
@@ -9,15 +9,9 @@ Enable the mod by the activation key (default `H`) or by clicking the activation
 When activated, clicking on any tile will display a toolbar with the drills the current tile can be mined with.
 The mechanical, pneumatic, laser, and airblast drill buttons fill the resource patch with drills and a bridge layout facing in the picked direction. Other registered drills, including drills loaded by server mods, are detected automatically and can be placed with the optimizer.
 
-![](showcase/bridge-drill.gif)
+Laser and airblast drills also use the bridge planner. Custom drills loaded into the game's content registry are detected automatically and can be placed with the optimizer.
 
-The laser and airblast drill buttons fill the resource patch with drills and places water extractors and power node adjacent to each drill if possible.
-
-![](showcase/optimization-drill.gif)
-
-For Erekir the mod enables you to automatically fill wall resources
-
-![](showcase/wall-drill.gif)
+For Erekir, the mod can automatically fill wall resources with beam drills.
 
 The mod has several configuration options.
 
@@ -44,6 +38,4 @@ The mod has several configuration options.
 - **Place Water Extractors and Power Nodes** 
   
   Whether to place water extractors and power nodes next to the drills
-
-![](showcase/settings.png)
 
