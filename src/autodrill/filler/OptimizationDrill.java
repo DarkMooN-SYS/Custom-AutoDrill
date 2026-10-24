@@ -8,6 +8,7 @@ import arc.struct.Seq;
 import arc.util.Log;
 import mindustry.Vars;
 import mindustry.content.Blocks;
+import mindustry.content.Liquids;
 import mindustry.entities.units.BuildPlan;
 import mindustry.game.Team;
 import mindustry.type.Item;
@@ -157,17 +158,22 @@ public class OptimizationDrill {
     public static void placeWaterExtractorsAndPowerNodes(
             Seq<Tile> selection, Drill drill, Team team, Seq<BuildPlan> allPlans) {
 
-        for (Tile t : selection) {
-            Seq<Tile> nearby = supportCandidates(t, drill.size, 8);
+        // Only add support that this drill actually consumes. Mechanical and
+        // pneumatic drills use neither water nor power, so they must not get
+        // extractors or nodes from this helper.
+        if (drill.consumesLiquid(Liquids.water)) {
+            for (Tile t : selection) {
+                Seq<Tile> nearby = supportCandidates(t, drill.size, 8);
 
-            for (Tile n : nearby) {
-                // SolidPump / water-extractor validates the required ground
-                // water attribute in Mindustry's own placement rules. It is
-                // not restricted to liquid floors.
-                BuildPlan plan = new BuildPlan(n.x, n.y, 0, Blocks.waterExtractor);
-                if (Util.canPlaceWithoutPlanCollision(plan, team, allPlans)) {
-                    allPlans.add(plan);
-                    break; // one water extractor per drill
+                for (Tile n : nearby) {
+                    // SolidPump / water-extractor validates the required ground
+                    // water attribute in Mindustry's own placement rules. It is
+                    // not restricted to liquid floors.
+                    BuildPlan plan = new BuildPlan(n.x, n.y, 0, Blocks.waterExtractor);
+                    if (Util.canPlaceWithoutPlanCollision(plan, team, allPlans)) {
+                        allPlans.add(plan);
+                        break; // one water extractor per drill
+                    }
                 }
             }
         }
