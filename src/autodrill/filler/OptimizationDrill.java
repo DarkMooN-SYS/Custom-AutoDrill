@@ -70,6 +70,11 @@ public class OptimizationDrill {
 
         recursiveMaxSearch(tiles, drill, team, tilesItemAndCount, selection, new Seq<>(), 0, new Seq<>(), maxTries, 0);
 
+        // The bounded recursive search can stop early on large ore patches.
+        // Greedily place any remaining valid drills that fit the chosen set,
+        // so an early search cutoff cannot leave easy, usable gaps behind.
+        completeDenseSelection(tiles, drill, selection);
+
         // Build drill plans, validating against each other
         for (Tile t : selection) {
             BuildPlan plan = new BuildPlan(t.x, t.y, 0, drill);
@@ -144,6 +149,22 @@ public class OptimizationDrill {
         selection.addAll(maxSelection);
 
         return max;
+    }
+
+    private static void completeDenseSelection(Seq<Tile> candidates, Drill drill, Seq<Tile> selection) {
+        Seq<Rect> occupied = new Seq<>();
+        for (Tile selected : selection) {
+            occupied.add(Util.getBlockRect(selected, drill));
+        }
+
+        for (Tile candidate : candidates) {
+            if (selection.contains(candidate, true)) continue;
+            Rect footprint = Util.getBlockRect(candidate, drill);
+            if (occupied.find(rect -> rect.overlaps(footprint)) == null) {
+                selection.add(candidate);
+                occupied.add(footprint);
+            }
+        }
     }
 
     /**
