@@ -261,6 +261,7 @@ public class AutoDrill extends Mod {
             if (!(block instanceof Drill)) continue;
             Drill drill = (Drill) block;
             if (isVanillaDrill(drill)) continue;
+            if (customDrills.contains(drill, true)) continue;
             customDrills.add(drill);
 
             ImageButton button = selectTable.button(new TextureRegionDrawable(drill.uiIcon), Styles.defaulti, () -> {
@@ -287,6 +288,11 @@ public class AutoDrill extends Mod {
     }
 
     private void updateSelectTable() {
+        // Some multiplayer servers synchronize their mod content after this
+        // mod's init() has already built the selector. Pick up newly synced
+        // drills each time the selector opens.
+        addNewCustomDrills();
+
         selectTable.removeChild(mechanicalDrillButton);
         if (Blocks.mechanicalDrill.environmentBuildable() && ((Drill) Blocks.mechanicalDrill).canMine(selectedTile)) {
             selectTable.add(mechanicalDrillButton);
@@ -331,10 +337,35 @@ public class AutoDrill extends Mod {
             Drill drill = customDrills.get(i);
             ImageButton button = customDrillButtons.get(i);
             selectTable.removeChild(button);
-            if (drill.environmentBuildable() && drill.canMine(selectedTile)) {
+            if (drill.environmentBuildable() && canMineNearby(drill, selectedTile)) {
                 selectTable.add(button);
             }
         }
+    }
+
+    private void addNewCustomDrills() {
+        for (Block block : Vars.content.blocks()) {
+            if (!(block instanceof Drill)) continue;
+            Drill drill = (Drill) block;
+            if (isVanillaDrill(drill) || customDrills.contains(drill, true)) continue;
+
+            customDrills.add(drill);
+            ImageButton button = selectTable.button(new TextureRegionDrawable(drill.uiIcon), Styles.defaulti, () -> {
+                enabled = false;
+                selectTable.visible = false;
+                OptimizationDrill.fill(selectedTile, drill);
+            }).get();
+            button.resizeImage(buttonSize);
+            customDrillButtons.add(button);
+        }
+    }
+
+    private boolean canMineNearby(Drill drill, Tile tile) {
+        if (drill.canMine(tile)) return true;
+        for (Tile linked : tile.getLinkedTilesAs(drill, new Seq<>())) {
+            if (drill.canMine(linked)) return true;
+        }
+        return false;
     }
 
     private boolean isVanillaDrill(Drill drill) {
@@ -423,3 +454,4 @@ public class AutoDrill extends Mod {
         }
     }
 }
+
