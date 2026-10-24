@@ -52,7 +52,7 @@ public class BridgeDrill {
             }
 
             Seq<Tile> neighbors = Util.getNearbyTiles(t.x, t.y, drill);
-            neighbors.retainAll(BridgeDrill::isBridgeTile);
+            neighbors.retainAll(n -> isBridgeTile(n) && isOutputSide(t, n, direction));
 
             for (Tile neighbor : neighbors) {
                 if (bridgeTiles.contains(neighbor)) return true;
@@ -293,6 +293,19 @@ public class BridgeDrill {
         short y = tile.y;
 
         return x % 3 == 0 && y % 3 == 0;
+    }
+
+    /** Only accept bridge links on the face the selected drill direction outputs to. */
+    private static boolean isOutputSide(Tile drillTile, Tile candidate, Direction direction) {
+        int dx = candidate.x - drillTile.x;
+        int dy = candidate.y - drillTile.y;
+        switch (direction) {
+            case UP: return dy > 0;
+            case DOWN: return dy < 0;
+            case LEFT: return dx < 0;
+            case RIGHT: return dx > 0;
+            default: return false;
+        }
     }
 }
 
