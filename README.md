@@ -1,26 +1,25 @@
 # Custom-AutoDrill
 
-Custom-AutoDrill is a DarkMooN-SYS-maintained fork of [Pointifix's AutoDrill](https://github.com/Pointifix/AutoDrill) for Mindustry. The original mod and its GPL-3.0 license are credited in this repository.
+Custom-AutoDrill is a Mindustry mod maintained by DarkMooN-SYS and based on [Pointifix's AutoDrill](https://github.com/Pointifix/AutoDrill).
+
+## Install
+
+Import the mod directly in Mindustry using this GitHub repository URL:
+
+https://github.com/DarkMooN-SYS/Custom-AutoDrill
+
+The repository includes a ready-to-use `Custom-AutoDrill.jar`. You do not need to build the mod or install a JDK.
 
 ## Features
 
-- Automatically fills ore patches with suitable drills.
-- Supports wall drills and bridge layouts from the original mod.
-- Detects registered modded `Drill` blocks, including custom blocks synchronized when joining a modded server.
-- Adds a water extractor only when the selected drill consumes water, and a power node only when it has a power consumer.
+- Automatically places drills over connected ore patches.
+- Supports the original wall drill and bridge drill layouts.
+- Detects custom drill blocks registered by installed mods, including blocks available on modded servers.
+- Adds a water extractor only when the selected drill consumes water.
+- Adds a power node only when the selected drill has a power consumer.
 
-Custom block definitions must be present in the client's Mindustry content registry. The mod does not fetch private server files or query arbitrary server configuration.
+Custom block definitions must be available in Mindustry's content registry. The mod does not download private server files.
 
-## Build
+## Credits and license
 
-Requires JDK 17. Build for Mindustry v160.7 with:
-
-```powershell
-.\gradlew.bat jar
-```
-
-The build downloads the official v160.7 `Mindustry.jar` for compilation and creates `build/libs/Custom-AutoDrill.jar`.
-
-## Attribution and license
-
-The upstream AutoDrill project was created by Pointifix. This fork keeps the upstream GPL-3.0 license; see [LICENSE](LICENSE). Custom-AutoDrill's changes are maintained by DarkMooN-SYS.
+The original AutoDrill was created by Pointifix. This fork retains its GPL-3.0 license; see [LICENSE](LICENSE). Custom-AutoDrill is maintained by DarkMooN-SYS.
