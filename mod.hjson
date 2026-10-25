@@ -1,0 +1,9 @@
+displayName: "Custom-AutoDrill"
+name: "auto-drill"
+author: "DarkMooN-SYS (fork of Pointifix AutoDrill)"
+main: "autodrill.AutoDrill"
+description: "Custom drill support and automated resource patch drilling"
+version: 1.2.0
+minGameVersion: 158
+java: true
+hidden: true
