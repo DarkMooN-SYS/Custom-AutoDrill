@@ -267,17 +267,25 @@ public class OptimizationDrill {
         }
     }
 
-    /** Find a nearby existing belt beyond a lane's feed edge. */
+    /** Find the closest existing conveyor near a lane's feed edge. */
     private static int[] findNearbyConveyor(int lane, int edge, boolean verticalLanes,
             boolean towardPositive, Block conveyor, int maxDistance) {
-        for (int distance = 1; distance <= maxDistance; distance++) {
-            int along = edge + (towardPositive ? distance : -distance);
-            int x = verticalLanes ? lane : along;
-            int y = verticalLanes ? along : lane;
-            Tile tile = Vars.world.tile(x, y);
-            if (tile != null && tile.block() == conveyor) return new int[]{x, y};
+        int originX = verticalLanes ? lane : edge;
+        int originY = verticalLanes ? edge : lane;
+        int[] best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (int dx = -maxDistance; dx <= maxDistance; dx++) {
+            for (int dy = -maxDistance; dy <= maxDistance; dy++) {
+                int distance = Math.abs(dx) + Math.abs(dy);
+                if (distance == 0 || distance > maxDistance || distance >= bestDistance) continue;
+                Tile tile = Vars.world.tile(originX + dx, originY + dy);
+                if (tile != null && tile.block() == conveyor) {
+                    best = new int[]{originX + dx, originY + dy};
+                    bestDistance = distance;
+                }
+            }
         }
-        return null;
+        return best;
     }
 
     /** Join a lane to a nearby conveyor with a short L-shaped connector. */
