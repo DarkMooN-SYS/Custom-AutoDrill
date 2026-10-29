@@ -228,8 +228,8 @@ public class OptimizationDrill {
         int exit = spans.get(spans.size / 2).coordinate;
         if (verticalLanes) {
             int merge = towardPositive
-                ? spans.max(s -> s.maxFeed).maxFeed + 1
-                : spans.min(s -> s.minFeed).minFeed - 1;
+                ? medianFeed(spans, true) + 1
+                : medianFeed(spans, false) - 1;
 
             for (LaneSpan span : spans) {
                 // Keep the main lane aligned to this row's actual drill span.
@@ -254,8 +254,8 @@ public class OptimizationDrill {
             addConveyor(exit, merge + direction.p.y, direction.r, conveyor, team, plans);
         } else {
             int merge = towardPositive
-                ? spans.max(s -> s.maxFeed).maxFeed + 1
-                : spans.min(s -> s.minFeed).minFeed - 1;
+                ? medianFeed(spans, true) + 1
+                : medianFeed(spans, false) - 1;
 
             for (LaneSpan span : spans) {
                 // Keep the main lane aligned to this row's actual drill span.
@@ -395,6 +395,15 @@ public class OptimizationDrill {
         if (tile == null || tile.block() == conveyor) return;
         BuildPlan plan = new BuildPlan(x, y, rotation, conveyor);
         if (Util.canPlaceWithoutPlanCollision(plan, team, plans)) plans.add(plan);
+    }
+
+    /** Choose the median row edge so the shared collector does not force every
+     * shorter lane to extend all the way to the single longest row. */
+    private static int medianFeed(Seq<LaneSpan> spans, boolean maximum) {
+        Seq<Integer> edges = new Seq<>();
+        for (LaneSpan span : spans) edges.add(maximum ? span.maxFeed : span.minFeed);
+        edges.sort(Integer::compare);
+        return edges.get(edges.size / 2);
     }
 
     private static class LaneSpan {
