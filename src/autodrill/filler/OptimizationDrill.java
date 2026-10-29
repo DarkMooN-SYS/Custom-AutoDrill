@@ -132,14 +132,17 @@ public class OptimizationDrill {
         recursiveMaxSearch(tiles, drill, team, tilesItemAndCount, selection,
             new Seq<>(), 0, new Seq<>(), maxTries, 0);
 
-        if (useConveyors) {
-            placeCompactConveyorLanes(selection, rotations, laneCoordinates, outputConveyor,
-                direction, team, allPlans);
-        }
-
+        // Reserve drill footprints first. Previously conveyor plans were added
+        // first, so a collector lane could occupy a selected drill tile and
+        // silently prevent that drill from being queued.
         for (Tile t : selection) {
             BuildPlan plan = new BuildPlan(t.x, t.y, rotations.get(t, 0), drill);
             if (Util.canPlaceWithoutPlanCollision(plan, team, allPlans)) allPlans.add(plan);
+        }
+
+        if (useConveyors) {
+            placeCompactConveyorLanes(selection, rotations, laneCoordinates, outputConveyor,
+                direction, team, allPlans);
         }
 
         if (waterExtractorsAndPowerNodes
@@ -196,19 +199,16 @@ public class OptimizationDrill {
             for (LaneSpan span : spans) {
                 int start = towardPositive ? span.minFeed : merge + 1;
                 int end = towardPositive ? merge - 1 : span.maxFeed;
-                for (int y = start; y <= end; y++) {
-                    addConveyor(span.coordinate, y, direction.r, conveyor, team, plans);
-                }
+                addConveyorLine(span.coordinate, start, span.coordinate, end,
+                    direction.r, conveyor, team, plans);
             }
 
             // One cross-belt merges the lane outputs. It flows toward the
             // middle lane, which becomes the single north/south outlet.
             int minLane = spans.first().coordinate;
             int maxLane = spans.peek().coordinate;
-            for (int x = minLane; x <= maxLane; x++) {
-                int rotation = x == exit ? direction.r : (x < exit ? Direction.RIGHT.r : Direction.LEFT.r);
-                addConveyor(x, merge, rotation, conveyor, team, plans);
-            }
+            addConveyorLine(minLane, merge, maxLane, merge,
+                direction.r, conveyor, team, plans);
             int outletX = exit;
             int outletY = merge + direction.p.y;
             addConveyor(outletX, outletY, direction.r, conveyor, team, plans);
@@ -222,21 +222,86 @@ public class OptimizationDrill {
             for (LaneSpan span : spans) {
                 int start = towardPositive ? span.minFeed : merge + 1;
                 int end = towardPositive ? merge - 1 : span.maxFeed;
-                for (int x = start; x <= end; x++) {
-                    addConveyor(x, span.coordinate, direction.r, conveyor, team, plans);
-                }
+                addConveyorLine(start, span.coordinate, end, span.coordinate,
+                    direction.r, conveyor, team, plans);
             }
 
             // A single vertical cross-belt collects every row and exits in
             // the chosen left/right direction at the center row.
             int minLane = spans.first().coordinate;
             int maxLane = spans.peek().coordinate;
-            for (int y = minLane; y <= maxLane; y++) {
-                int rotation = y == exit ? direction.r : (y < exit ? Direction.UP.r : Direction.DOWN.r);
-                addConveyor(merge, y, rotation, conveyor, team, plans);
-            }
+            addConveyorLine(merge, minLane, merge, maxLane,
+                direction.r, conveyor, team, plans);
             int outletX = merge + direction.p.x;
             addConveyor(outletX, exit, direction.r, conveyor, team, plans);
+        }
+    }
+
+    /**
+     * Place a straight conveyor run. If a planned drill/building blocks a tile,
+     * try to bridge across the blocked tile(s) with an item bridge pair three
+     * tiles apart. Bridge endpoints are reserved only when both can be placed.
+     */
+    private static void addConveyorLine(int x1, int y1, int x2, int y2, int rotation,
+            Block conveyor, Team team, Seq<BuildPlan> plans) {
+        int dx = Integer.compare(x2, x1);
+        int dy = Integer.compare(y2, y1);
+        int length = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+        if (length == 0) {
+            addConveyor(x1, y1, rotation, conveyor, team, plans);
+            return;
+        }
+
+        int i = 0;
+        while (i <= length) {
+            int x = x1 + dx * i;
+            int y = y1 + dy * i;
+            Tile tile = Vars.world.tile(x, y);
+            BuildPlan belt = new BuildPlan(x, y, rotation, conveyor);
+            if (tile != null && (tile.block() == conveyor
+                    || Util.canPlaceWithoutPlanCollision(belt, team, plans))) {
+                if (tile.block() != conveyor) plans.add(belt);
+                i++;
+                continue;
+            }
+
+            // Need a gap of two tiles between bridge endpoints (distance 3).
+            // Reuse the previous belt as the first bridge endpoint.
+            if (i > 0 && i + 2 <= length) {
+                int sx = x1 + dx * (i - 1);
+                int sy = y1 + dy * (i - 1);
+                int ex = x1 + dx * (i + 2);
+                int ey = y1 + dy * (i + 2);
+                BuildPlan startBridge = new BuildPlan(sx, sy, 0, Blocks.itemBridge,
+                    new arc.math.geom.Point2(ex - sx, ey - sy));
+                BuildPlan endBridge = new BuildPlan(ex, ey, 0, Blocks.itemBridge,
+                    new arc.math.geom.Point2());
+                int previousIndex = -1;
+                for (int p = 0; p < plans.size; p++) {
+                    BuildPlan existing = plans.get(p);
+                    if (existing.x == sx && existing.y == sy && existing.block == conveyor) {
+                        previousIndex = p;
+                        break;
+                    }
+                }
+                if (previousIndex >= 0) {
+                    BuildPlan old = plans.remove(previousIndex);
+                    boolean startFree = Util.canPlaceBlock(Blocks.itemBridge, team, sx, sy, 0)
+                        && !Util.footprintOverlapsPlanned(Blocks.itemBridge, sx, sy, plans);
+                    boolean endFree = Util.canPlaceWithoutPlanCollision(endBridge, team, plans);
+                    if (startFree && endFree) {
+                        plans.add(startBridge);
+                        plans.add(endBridge);
+                        i += 3;
+                        continue;
+                    }
+                    plans.add(old);
+                }
+            }
+
+            // A blocked cell that cannot be bridged is left empty rather than
+            // placing a belt over a drill or another planned structure.
+            i++;
         }
     }
 
