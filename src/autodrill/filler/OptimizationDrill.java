@@ -32,8 +32,17 @@ public class OptimizationDrill {
         fill(tile, drill, waterExtractorsAndPowerNodes, Direction.UP);
     }
 
+    public static void fill(Tile tile, Drill drill, Block conveyor, Direction direction) {
+        fill(tile, drill, true, direction, conveyor);
+    }
+
     private static void fill(Tile tile, Drill drill, boolean waterExtractorsAndPowerNodes,
             Direction direction) {
+        fill(tile, drill, waterExtractorsAndPowerNodes, direction, null);
+    }
+
+    private static void fill(Tile tile, Drill drill, boolean waterExtractorsAndPowerNodes,
+            Direction direction, Block conveyorOverride) {
         Team team = Vars.player.team();
         String drillPrefix = getDrillSettingsPrefix(drill);
         int maxTiles = Core.settings.getInt(drillPrefix + "-drill-max-tiles");
@@ -43,7 +52,9 @@ public class OptimizationDrill {
         Seq<Tile> originalCandidates = tiles.copy();
         int minOresPerDrill = Core.settings.getInt(drillPrefix + "-drill-min-ores");
         Floor floor = tile.overlay() != Blocks.air ? tile.overlay() : tile.floor();
-        Block conveyor = drill.size == 1 ? Vars.content.block("titanium-conveyor") : null;
+        Block conveyor = drill.size == 1
+            ? (conveyorOverride != null ? conveyorOverride : Vars.content.block("titanium-conveyor"))
+            : null;
         if (drill.size == 1 && conveyor == null) conveyor = Blocks.conveyor;
         final Block outputConveyor = conveyor;
         boolean useConveyors = conveyor != null;
