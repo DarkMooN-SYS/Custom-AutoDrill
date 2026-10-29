@@ -232,10 +232,17 @@ public class OptimizationDrill {
                 : spans.min(s -> s.minFeed).minFeed - 1;
 
             for (LaneSpan span : spans) {
-                int start = towardPositive ? span.minFeed : merge + 1;
-                int end = towardPositive ? merge - 1 : span.maxFeed;
-                addConveyorLine(span.coordinate, start, span.coordinate, end,
+                // Keep the main lane aligned to this row's actual drill span.
+                // Only add the extra segment needed to reach the shared collector.
+                addConveyorLine(span.coordinate, span.minFeed, span.coordinate, span.maxFeed,
                     direction.r, conveyor, team, plans);
+                if (towardPositive) {
+                    addConveyorLine(span.coordinate, span.maxFeed + 1,
+                        span.coordinate, merge - 1, direction.r, conveyor, team, plans);
+                } else {
+                    addConveyorLine(span.coordinate, merge + 1,
+                        span.coordinate, span.minFeed - 1, direction.r, conveyor, team, plans);
+                }
             }
 
             int minLane = spans.first().coordinate;
@@ -251,10 +258,17 @@ public class OptimizationDrill {
                 : spans.min(s -> s.minFeed).minFeed - 1;
 
             for (LaneSpan span : spans) {
-                int start = towardPositive ? span.minFeed : merge + 1;
-                int end = towardPositive ? merge - 1 : span.maxFeed;
-                addConveyorLine(start, span.coordinate, end, span.coordinate,
+                // Keep the main lane aligned to this row's actual drill span.
+                // Only add the extra segment needed to reach the shared collector.
+                addConveyorLine(span.minFeed, span.coordinate, span.maxFeed, span.coordinate,
                     direction.r, conveyor, team, plans);
+                if (towardPositive) {
+                    addConveyorLine(span.maxFeed + 1, span.coordinate,
+                        merge - 1, span.coordinate, direction.r, conveyor, team, plans);
+                } else {
+                    addConveyorLine(merge + 1, span.coordinate,
+                        span.minFeed - 1, span.coordinate, direction.r, conveyor, team, plans);
+                }
             }
 
             int minLane = spans.first().coordinate;
