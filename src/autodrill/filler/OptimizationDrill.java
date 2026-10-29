@@ -205,11 +205,21 @@ public class OptimizationDrill {
                 towardPositive, conveyor, 8);
             if (targets[i] != null) connectedCount++;
         }
-        if (connectedCount == spans.size) {
+        // Route each lane independently when it can reach an existing belt.
+        // Previously this was all-or-nothing: a single lane without a nearby
+        // target forced every lane back into one shared collector, leaving
+        // nearby outlets unused and creating long, unnecessary runs.
+        if (connectedCount > 0) {
+            Seq<Integer> unresolvedLanes = new Seq<>();
             for (int i = 0; i < spans.size; i++) {
                 LaneSpan span = spans.get(i);
-                int edge = towardPositive ? span.maxFeed : span.minFeed;
                 int[] target = targets[i];
+                if (target == null) {
+                    unresolvedLanes.add(span.coordinate);
+                    continue;
+                }
+
+                int edge = towardPositive ? span.maxFeed : span.minFeed;
                 if (verticalLanes) {
                     addConveyorLine(span.coordinate, span.minFeed, span.coordinate, span.maxFeed,
                         direction.r, conveyor, team, plans);
@@ -222,6 +232,19 @@ public class OptimizationDrill {
                         direction, false, conveyor, team, plans);
                 }
             }
+
+            if (unresolvedLanes.isEmpty()) return;
+
+            Seq<Tile> unresolvedDrills = new Seq<>();
+            for (Tile drill : selection) {
+                int rotation = rotations.get(drill, 0);
+                int feedLane = verticalLanes
+                    ? drill.x + (rotation == 2 ? -1 : 1)
+                    : drill.y + (rotation == 3 ? -1 : 1);
+                if (unresolvedLanes.contains(feedLane)) unresolvedDrills.add(drill);
+            }
+            placeCompactConveyorLanes(unresolvedDrills, rotations, unresolvedLanes,
+                conveyor, direction, team, plans);
             return;
         }
 
