@@ -193,41 +193,33 @@ public class OptimizationDrill {
         if (spans.isEmpty()) return;
         spans.sort(s -> s.coordinate);
 
-        // First try joining each lane to an already-built conveyor network.
-        // The closest target wins, so long empty collector runs are avoided.
-        boolean connectedExisting = false;
-        for (LaneSpan span : spans) {
+        // Resolve targets before adding plans. Only replace the shared collector
+        // when every lane can reach an existing belt; otherwise keep the safe
+        // collector fallback so no lane is left disconnected.
+        int[][] targets = new int[spans.size][];
+        int connectedCount = 0;
+        for (int i = 0; i < spans.size; i++) {
+            LaneSpan span = spans.get(i);
             int edge = towardPositive ? span.maxFeed : span.minFeed;
-            int[] target = findNearbyConveyor(span.coordinate, edge, verticalLanes,
+            targets[i] = findNearbyConveyor(span.coordinate, edge, verticalLanes,
                 towardPositive, conveyor, 8);
-            if (target == null) continue;
-
-            if (verticalLanes) {
-                addConveyorLine(span.coordinate, span.minFeed, span.coordinate, span.maxFeed,
-                    direction.r, conveyor, team, plans);
-                addConveyorPath(span.coordinate, edge, target[0], target[1],
-                    direction, verticalLanes, conveyor, team, plans);
-            } else {
-                addConveyorLine(span.minFeed, span.coordinate, span.maxFeed, span.coordinate,
-                    direction.r, conveyor, team, plans);
-                addConveyorPath(edge, span.coordinate, target[0], target[1],
-                    direction, verticalLanes, conveyor, team, plans);
-            }
-            connectedExisting = true;
+            if (targets[i] != null) connectedCount++;
         }
-        if (connectedExisting) {
-            // Lanes already connected to an existing network should not also
-            // be dragged to the artificial shared outlet.
-            for (LaneSpan span : spans) {
-                if (findNearbyConveyor(span.coordinate,
-                        towardPositive ? span.maxFeed : span.minFeed,
-                        verticalLanes, towardPositive, conveyor, 8) != null) continue;
+        if (connectedCount == spans.size) {
+            for (int i = 0; i < spans.size; i++) {
+                LaneSpan span = spans.get(i);
+                int edge = towardPositive ? span.maxFeed : span.minFeed;
+                int[] target = targets[i];
                 if (verticalLanes) {
                     addConveyorLine(span.coordinate, span.minFeed, span.coordinate, span.maxFeed,
                         direction.r, conveyor, team, plans);
+                    addConveyorPath(span.coordinate, edge, target[0], target[1],
+                        direction, true, conveyor, team, plans);
                 } else {
                     addConveyorLine(span.minFeed, span.coordinate, span.maxFeed, span.coordinate,
                         direction.r, conveyor, team, plans);
+                    addConveyorPath(edge, span.coordinate, target[0], target[1],
+                        direction, false, conveyor, team, plans);
                 }
             }
             return;
