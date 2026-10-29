@@ -161,7 +161,13 @@ public class OptimizationDrill {
         return tile.block() == conveyor || Util.canPlaceBlock(conveyor, team, tile.x, tile.y, 0);
     }
 
-    /** Merge all active drill lanes into one short collector and one outlet. */
+    /**
+     * Extend each active drill lane only as far as needed. If a conveyor
+     * already exists nearby, connect to that network using a short L-shaped
+     * route instead of forcing every lane all the way to one distant outlet.
+     * Otherwise use a compact collector with belt directions matching each
+     * segment's actual flow.
+     */
     private static void placeCompactConveyorLanes(Seq<Tile> selection,
             ObjectIntMap<Tile> rotations, Seq<Integer> laneCoordinates, Block conveyor,
             Direction direction, Team team, Seq<BuildPlan> plans) {
@@ -185,17 +191,46 @@ public class OptimizationDrill {
             if (minFeed != Integer.MAX_VALUE) spans.add(new LaneSpan(lane, minFeed, maxFeed));
         }
         if (spans.isEmpty()) return;
-
         spans.sort(s -> s.coordinate);
-        int exit = spans.get(spans.size / 2).coordinate;
 
+        // Resolve targets before adding plans. Only replace the shared collector
+        // when every lane can reach an existing belt; otherwise keep the safe
+        // collector fallback so no lane is left disconnected.
+        int[][] targets = new int[spans.size][];
+        int connectedCount = 0;
+        for (int i = 0; i < spans.size; i++) {
+            LaneSpan span = spans.get(i);
+            int edge = towardPositive ? span.maxFeed : span.minFeed;
+            targets[i] = findNearbyConveyor(span.coordinate, edge, verticalLanes,
+                towardPositive, conveyor, 8);
+            if (targets[i] != null) connectedCount++;
+        }
+        if (connectedCount == spans.size) {
+            for (int i = 0; i < spans.size; i++) {
+                LaneSpan span = spans.get(i);
+                int edge = towardPositive ? span.maxFeed : span.minFeed;
+                int[] target = targets[i];
+                if (verticalLanes) {
+                    addConveyorLine(span.coordinate, span.minFeed, span.coordinate, span.maxFeed,
+                        direction.r, conveyor, team, plans);
+                    addConveyorPath(span.coordinate, edge, target[0], target[1],
+                        direction, true, conveyor, team, plans);
+                } else {
+                    addConveyorLine(span.minFeed, span.coordinate, span.maxFeed, span.coordinate,
+                        direction.r, conveyor, team, plans);
+                    addConveyorPath(edge, span.coordinate, target[0], target[1],
+                        direction, false, conveyor, team, plans);
+                }
+            }
+            return;
+        }
+
+        int exit = spans.get(spans.size / 2).coordinate;
         if (verticalLanes) {
             int merge = towardPositive
                 ? spans.max(s -> s.maxFeed).maxFeed + 1
                 : spans.min(s -> s.minFeed).minFeed - 1;
 
-            // Extend every active lane to the same merge row. Stopping each
-            // lane at its own last drill leaves shorter lanes disconnected.
             for (LaneSpan span : spans) {
                 int start = towardPositive ? span.minFeed : merge + 1;
                 int end = towardPositive ? merge - 1 : span.maxFeed;
@@ -203,22 +238,18 @@ public class OptimizationDrill {
                     direction.r, conveyor, team, plans);
             }
 
-            // One cross-belt merges the lane outputs. It flows toward the
-            // middle lane, which becomes the single north/south outlet.
             int minLane = spans.first().coordinate;
             int maxLane = spans.peek().coordinate;
-            addConveyorLine(minLane, merge, maxLane, merge,
-                direction.r, conveyor, team, plans);
-            int outletX = exit;
-            int outletY = merge + direction.p.y;
-            addConveyor(outletX, outletY, direction.r, conveyor, team, plans);
+            for (int x = minLane; x <= maxLane; x++) {
+                int crossRotation = x < exit ? 0 : x > exit ? 2 : direction.r;
+                addConveyor(x, merge, crossRotation, conveyor, team, plans);
+            }
+            addConveyor(exit, merge + direction.p.y, direction.r, conveyor, team, plans);
         } else {
             int merge = towardPositive
                 ? spans.max(s -> s.maxFeed).maxFeed + 1
                 : spans.min(s -> s.minFeed).minFeed - 1;
 
-            // Extend every active lane to the same merge column so no output
-            // is left stranded before reaching the shared collector.
             for (LaneSpan span : spans) {
                 int start = towardPositive ? span.minFeed : merge + 1;
                 int end = towardPositive ? merge - 1 : span.maxFeed;
@@ -226,14 +257,53 @@ public class OptimizationDrill {
                     direction.r, conveyor, team, plans);
             }
 
-            // A single vertical cross-belt collects every row and exits in
-            // the chosen left/right direction at the center row.
             int minLane = spans.first().coordinate;
             int maxLane = spans.peek().coordinate;
-            addConveyorLine(merge, minLane, merge, maxLane,
-                direction.r, conveyor, team, plans);
-            int outletX = merge + direction.p.x;
-            addConveyor(outletX, exit, direction.r, conveyor, team, plans);
+            for (int y = minLane; y <= maxLane; y++) {
+                int crossRotation = y < exit ? 1 : y > exit ? 3 : direction.r;
+                addConveyor(merge, y, crossRotation, conveyor, team, plans);
+            }
+            addConveyor(merge + direction.p.x, exit, direction.r, conveyor, team, plans);
+        }
+    }
+
+    /** Find the closest existing conveyor near a lane's feed edge. */
+    private static int[] findNearbyConveyor(int lane, int edge, boolean verticalLanes,
+            boolean towardPositive, Block conveyor, int maxDistance) {
+        int originX = verticalLanes ? lane : edge;
+        int originY = verticalLanes ? edge : lane;
+        int[] best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (int dx = -maxDistance; dx <= maxDistance; dx++) {
+            for (int dy = -maxDistance; dy <= maxDistance; dy++) {
+                int distance = Math.abs(dx) + Math.abs(dy);
+                if (distance == 0 || distance > maxDistance || distance >= bestDistance) continue;
+                Tile tile = Vars.world.tile(originX + dx, originY + dy);
+                if (tile != null && tile.block() == conveyor) {
+                    best = new int[]{originX + dx, originY + dy};
+                    bestDistance = distance;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Join a lane to a nearby conveyor with a short L-shaped connector. */
+    private static void addConveyorPath(int x1, int y1, int x2, int y2,
+            Direction outputDirection, boolean verticalLanes, Block conveyor,
+            Team team, Seq<BuildPlan> plans) {
+        int firstX = x2;
+        int firstY = y1;
+        if (verticalLanes) {
+            // Turn sideways first, then enter the target belt from its side.
+            addConveyorLine(x1, y1, x2, y1, x2 >= x1 ? 0 : 2, conveyor, team, plans);
+            addConveyorLine(x2, y1, x2, y2,
+                y2 >= y1 ? 1 : 3, conveyor, team, plans);
+        } else {
+            addConveyorLine(x1, y1, x1, y2,
+                y2 >= y1 ? 1 : 3, conveyor, team, plans);
+            addConveyorLine(x1, y2, x2, y2,
+                x2 >= x1 ? 0 : 2, conveyor, team, plans);
         }
     }
 
