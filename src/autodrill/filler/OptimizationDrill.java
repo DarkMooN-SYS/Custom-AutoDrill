@@ -207,10 +207,8 @@ public class OptimizationDrill {
             // middle lane, which becomes the single north/south outlet.
             int minLane = spans.first().coordinate;
             int maxLane = spans.peek().coordinate;
-            for (int x = minLane; x <= maxLane; x++) {
-                int rotation = x == exit ? direction.r : (x < exit ? Direction.RIGHT.r : Direction.LEFT.r);
-                addConveyor(x, merge, rotation, conveyor, team, plans);
-            }
+            addConveyorLine(minLane, merge, maxLane, merge,
+                direction.r, conveyor, team, plans);
             int outletX = exit;
             int outletY = merge + direction.p.y;
             addConveyor(outletX, outletY, direction.r, conveyor, team, plans);
@@ -232,10 +230,8 @@ public class OptimizationDrill {
             // the chosen left/right direction at the center row.
             int minLane = spans.first().coordinate;
             int maxLane = spans.peek().coordinate;
-            for (int y = minLane; y <= maxLane; y++) {
-                int rotation = y == exit ? direction.r : (y < exit ? Direction.UP.r : Direction.DOWN.r);
-                addConveyor(merge, y, rotation, conveyor, team, plans);
-            }
+            addConveyorLine(merge, minLane, merge, maxLane,
+                direction.r, conveyor, team, plans);
             int outletX = merge + direction.p.x;
             addConveyor(outletX, exit, direction.r, conveyor, team, plans);
         }
