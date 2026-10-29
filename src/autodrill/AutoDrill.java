@@ -47,10 +47,13 @@ public class AutoDrill extends Mod {
     private Tile selectedTile;
 
     private final Table selectTable = new Table(Styles.black3);
+    private final Table conveyorTable = new Table(Styles.black3);
     private final Table directionTable = new Table(Styles.black3);
     private ImageButton enableButton;
 
     private Cons<Direction> directionAction;
+    private Drill pendingDrill;
+    private Block selectedConveyor;
 
     private ImageButton mechanicalDrillButton, pneumaticDrillButton, blastDrillButton, laserDrillButton, plasmaBoreButton, largePlasmaBoreButton, impactDrillButton, eruptionDrillButton;
     private final Seq<Drill> customDrills = new Seq<>();
@@ -89,6 +92,7 @@ public class AutoDrill extends Mod {
         }
 
         buildSelectTable();
+        buildConveyorTable();
         buildDirectionTable();
 
         // A server map transition may rebuild content and invalidate cached
@@ -149,6 +153,7 @@ public class AutoDrill extends Mod {
                     if (Core.settings.getString(bundle.get("auto-drill.settings.activation-key")).equalsIgnoreCase(keyCode.value)) {
                         enabled = !enabled;
                         selectTable.visible = false;
+                        conveyorTable.visible = false;
                         directionTable.visible = false;
                         enableButton.setChecked(enabled);
                     }
@@ -168,6 +173,7 @@ public class AutoDrill extends Mod {
 
                 Vec2 v = Core.camera.project(selectedTile.centerX() * Vars.tilesize, (selectedTile.centerY() + 1) * Vars.tilesize);
                 selectTable.setPosition(v.x, v.y, Align.bottom);
+                conveyorTable.setPosition(v.x, v.y, Align.bottom);
                 directionTable.setPosition(v.x, v.y, Align.bottom);
 
                 Fx.tapBlock.at(selectedTile.getX(), selectedTile.getY());
@@ -178,6 +184,7 @@ public class AutoDrill extends Mod {
             enableButton = t.button(new TextureRegionDrawable(Core.atlas.find("auto-drill-logo")), Styles.emptyTogglei, () -> {
                 enabled = !enabled;
                 selectTable.visible = false;
+                conveyorTable.visible = false;
                 directionTable.visible = false;
             }).get();
             enableButton.resizeImage(buttonSize);
@@ -335,8 +342,12 @@ public class AutoDrill extends Mod {
                 enabled = false;
                 selectTable.visible = false;
                 if (drill.size == 1) {
-                    directionTable.visible = true;
-                    directionAction = direction -> OptimizationDrill.fill(selectedTile, drill, direction);
+                    pendingDrill = drill;
+                    conveyorTable.visible = true;
+                    directionTable.visible = false;
+                    Vec2 v = Core.camera.project(selectedTile.centerX() * Vars.tilesize,
+                        (selectedTile.centerY() + 1) * Vars.tilesize);
+                    conveyorTable.setPosition(v.x, v.y, Align.bottom);
                 } else {
                     OptimizationDrill.fill(selectedTile, drill);
                 }
@@ -349,7 +360,10 @@ public class AutoDrill extends Mod {
     private void resetDrillSelector() {
         enabled = false;
         selectedTile = null;
+        pendingDrill = null;
+        selectedConveyor = null;
         selectTable.visible = false;
+        conveyorTable.visible = false;
         directionTable.visible = false;
         customDrills.clear();
         customDrillButtons.clear();
@@ -370,6 +384,62 @@ public class AutoDrill extends Mod {
             || drill == Blocks.laserDrill || drill == Blocks.blastDrill
             || drill == Blocks.impactDrill || drill == Blocks.eruptionDrill
             || drill == Blocks.plasmaBore || drill == Blocks.largePlasmaBore;
+    }
+
+    private void buildConveyorTable() {
+        conveyorTable.update(() -> {
+            if (Vars.state.isMenu() || selectedTile == null) {
+                conveyorTable.visible = false;
+                return;
+            }
+            Vec2 v = Core.camera.project(selectedTile.centerX() * Vars.tilesize,
+                (selectedTile.centerY() + 1) * Vars.tilesize);
+            conveyorTable.setPosition(v.x, v.y, Align.bottom);
+        });
+
+        conveyorTable.button(new TextureRegionDrawable(Blocks.conveyor.uiIcon), Styles.defaulti, () -> {
+            chooseConveyor(Blocks.conveyor);
+        }).get().resizeImage(buttonSize);
+
+        Block titaniumConveyor = Vars.content.block("titanium-conveyor");
+        if (titaniumConveyor != null) {
+            conveyorTable.button(new TextureRegionDrawable(titaniumConveyor.uiIcon), Styles.defaulti, () -> {
+                chooseConveyor(titaniumConveyor);
+            }).get().resizeImage(buttonSize);
+        }
+
+        conveyorTable.button(Icon.cancel, Styles.defaulti, () -> {
+            conveyorTable.visible = false;
+            pendingDrill = null;
+        }).get().resizeImage(buttonSize);
+
+        Core.input.addProcessor(new InputProcessor() {
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, KeyCode button) {
+                if (!conveyorTable.hasMouse()) conveyorTable.visible = false;
+                return InputProcessor.super.touchDown(screenX, screenY, pointer, button);
+            }
+        });
+
+        conveyorTable.pack();
+        conveyorTable.act(0);
+        conveyorTable.visible = false;
+        Core.scene.root.addChildAt(0, conveyorTable);
+    }
+
+    private void chooseConveyor(Block conveyor) {
+        if (pendingDrill == null || selectedTile == null) {
+            conveyorTable.visible = false;
+            return;
+        }
+        selectedConveyor = conveyor;
+        conveyorTable.visible = false;
+        directionAction = direction -> OptimizationDrill.fill(
+            selectedTile, pendingDrill, selectedConveyor, direction);
+        directionTable.visible = true;
+        Vec2 v = Core.camera.project(selectedTile.centerX() * Vars.tilesize,
+            (selectedTile.centerY() + 1) * Vars.tilesize);
+        directionTable.setPosition(v.x, v.y, Align.bottom);
     }
 
     private void buildDirectionTable() {
